@@ -39,34 +39,80 @@ def update_displays():
 
 # —───────────────────────────────────────────────────────────────────────────
 # Track geometry helpers
+# —───────────────────────────────────────────────────────────────────────────
 def r_of_s(s_val):
-    if s_val < L_ramp:
-        phi = np.pi/2 - s_val/h0
-        return vector(h0*np.cos(phi), h0*np.sin(phi), 0)
-    s2 = s_val - L_ramp
+    # Parameters for the entry curve
+    entry_length = L_ramp
+    entry_height = h0
+    curve_sharpness = 2.0  # Higher = sharper curve, lower = smoother
+
+    # Center the whole track horizontally at x=0
+    total_x = entry_length + L_buffer + 2 * R + L_exit
+    x_offset = -total_x / 2
+
+    # --- Smooth ramp using a clothoid (Euler spiral) for G1/G2 continuity ---
+    # We'll blend the ramp into the flat using a cubic Hermite curve for y(x)
+    # The ramp goes from (0, h0) to (entry_length, 0) with zero slope at both ends
+
+    if s_val < entry_length:
+        # Hermite cubic: y = h0 * (2*(s/L)^3 - 3*(s/L)^2 + 1)
+        t = s_val / entry_length
+        y = h0 * (2 * t**3 - 3 * t**2 + 1)
+        x = s_val
+        return vector(x + x_offset, y, 0)
+    s2 = s_val - entry_length
     if s2 < L_buffer:
-        return vector(h0 + s2, 0, 0)
+        # Flat buffer
+        return vector(entry_length + s2 + x_offset, 0, 0)
     s3 = s2 - L_buffer
     if s3 < L_loop:
         phi = -np.pi/2 + s3/R
-        center = vector(h0 + L_buffer + R, R, 0)
+        center = vector(entry_length + L_buffer + R + x_offset, R, 0)
         return vector(center.x + R*np.cos(phi), center.y + R*np.sin(phi), 0)
     s4 = s3 - L_loop
-    return vector(h0 + L_buffer + 2*R + s4, 0, 0)
+    return vector(entry_length + L_buffer + 2*R + s4 + x_offset, 0, 0)
+
 def theta_of_s(s_val):
-    if s_val < L_ramp:
-        phi = np.pi/2 - s_val/h0; return phi + np.pi/2
-    s2 = s_val - L_ramp;  
-    if s2 < L_buffer: return 0.0
+    # Slope angle of the track (for normal force)
+    entry_length = L_ramp
+    if s_val < entry_length:
+        # Derivative of Hermite cubic
+        t = s_val / entry_length
+        dydt = h0 * (6 * t**2 - 6 * t) / entry_length
+        dxdt = 1
+        return np.arctan2(dydt, dxdt)
+    s2 = s_val - entry_length
+    if s2 < L_buffer:
+        return 0.0
     s3 = s2 - L_buffer
-    if s3 < L_loop: phi = -np.pi/2 + s3/R; return phi + np.pi/2
+    if s3 < L_loop:
+        phi = -np.pi/2 + s3/R
+        return phi + np.pi/2
     return 0.0
+
 def curvature_radius(s_val):
-    if s_val < L_ramp: return h0
-    s2 = s_val - L_ramp
-    if s2 < L_buffer: return np.inf
+    # Radius of curvature for normal force calculation
+    entry_length = L_ramp
+    if s_val < entry_length:
+        # Hermite cubic second derivative
+        t = s_val / entry_length
+        d2ydt2 = h0 * (12 * t - 6) / (entry_length**2)
+        dydt = h0 * (6 * t**2 - 6 * t) / entry_length
+        dxdt = 1
+        # Curvature formula: |y''| / (1 + y'^2)^(3/2)
+        denom = (dxdt**2 + dydt**2) ** 1.5
+        if denom == 0:
+            return np.inf
+        kappa = abs(d2ydt2) / denom
+        if kappa == 0:
+            return np.inf
+        return 1 / kappa
+    s2 = s_val - entry_length
+    if s2 < L_buffer:
+        return np.inf
     s3 = s2 - L_buffer
-    if s3 < L_loop: return R
+    if s3 < L_loop:
+        return R
     return np.inf
 
 # —───────────────────────────────────────────────────────────────────────────
