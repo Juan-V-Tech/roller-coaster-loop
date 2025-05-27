@@ -123,16 +123,16 @@ run_btn = button(text="Run / Reset", bind=init_sim)
 # —───────────────────────────────────────────────────────────────────────────
 # Create graphs aligned to the right of the 3D view
 graph_energy = graph(
-    title='Energy vs s', xtitle='s (m)', ytitle='Energy (J)',
-    width=300, height=250, align='right'
+    title='Energy vs t', xtitle='t (s)', ytitle='Energy (J)',
+    width=700, height=250, align='right'
 )
 ke_curve  = gcurve(graph=graph_energy, color=color.blue, label='KE')
 pe_curve  = gcurve(graph=graph_energy, color=color.green, label='PE')
 tot_curve = gcurve(graph=graph_energy, color=color.black, label='Total E')
 
 graph_force = graph(
-    title='Normal Force vs s', xtitle='s (m)', ytitle='N (N)',
-    width=300, height=250, align='right'
+    title='Normal Force vs t', xtitle='t (s)', ytitle='N (N)',
+    width=700, height=250, align='right'
 )
 n_curve = gcurve(graph=graph_force, color=color.red, label='N')
 
@@ -143,7 +143,7 @@ update_displays()
 # —───────────────────────────────────────────────────────────────────────────
 # Main loop: animate and plot in real time
 while True:
-    rate(100)
+    rate(60)
     if not simulate:
         continue
     # current speed and height
