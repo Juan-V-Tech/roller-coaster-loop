@@ -11,21 +11,16 @@ from vpython import (
 g = 9.81   # gravitational acceleration (m/s²)
 m = 1.0    # mass of cart (kg) for normal-force calculation
 
-ds = 0.02
+ds = 0.02  # fixed arc-length step
 
 # Dynamic parameters (updated in init_sim())
 h0, R = 5.0, 1.0
 L_ramp = L_buffer = L_loop = L_exit = s_end = 0.0
 
-# Simulation flags & position
 simulate = False
 s = 0.0
 
-# References to VPython objects for reuse
-track = None
-cart  = None
-
-# Graph handles (created once)
+# References to VPython objects
 graph_energy = None
 ke_curve = None
 pe_curve = None
@@ -33,17 +28,18 @@ tot_curve = None
 
 graph_force = None
 n_curve = None
+track = None
+cart = None
 
 # —───────────────────────────────────────────────────────────────────────────
-# Slider display callback
-def update_displays(evt=None):
+# Slider display update
+def update_displays():
     h_display.text = f" {h_slider.value:.2f}"
     R_display.text = f" {R_slider.value:.2f}"
 
 # —───────────────────────────────────────────────────────────────────────────
-# Geometry helper functions
+# Track geometry helpers
 def r_of_s(s_val):
-    """Position along track for arc-length s_val."""
     if s_val < L_ramp:
         phi = np.pi/2 - s_val/h0
         return vector(h0*np.cos(phi), h0*np.sin(phi), 0)
@@ -54,173 +50,135 @@ def r_of_s(s_val):
     if s3 < L_loop:
         phi = -np.pi/2 + s3/R
         center = vector(h0 + L_buffer + R, R, 0)
-        return vector(center.x + R*np.cos(phi),
-                      center.y + R*np.sin(phi), 0)
-    # flat exit
+        return vector(center.x + R*np.cos(phi), center.y + R*np.sin(phi), 0)
     s4 = s3 - L_loop
     return vector(h0 + L_buffer + 2*R + s4, 0, 0)
-
 def theta_of_s(s_val):
     if s_val < L_ramp:
-        phi = np.pi/2 - s_val/h0
-        return phi + np.pi/2
-    s2 = s_val - L_ramp
-    if s2 < L_buffer:
-        return 0.0
+        phi = np.pi/2 - s_val/h0; return phi + np.pi/2
+    s2 = s_val - L_ramp;  
+    if s2 < L_buffer: return 0.0
     s3 = s2 - L_buffer
-    if s3 < L_loop:
-        phi = -np.pi/2 + s3/R
-        return phi + np.pi/2
+    if s3 < L_loop: phi = -np.pi/2 + s3/R; return phi + np.pi/2
     return 0.0
-
 def curvature_radius(s_val):
-    if s_val < L_ramp:
-        return h0
+    if s_val < L_ramp: return h0
     s2 = s_val - L_ramp
-    if s2 < L_buffer:
-        return np.inf
+    if s2 < L_buffer: return np.inf
     s3 = s2 - L_buffer
-    if s3 < L_loop:
-        return R
+    if s3 < L_loop: return R
     return np.inf
 
 # —───────────────────────────────────────────────────────────────────────────
-# Create 3D scene with reduced width so graphs fit on right
+# Initialize VPython canvas and UI
+# —───────────────────────────────────────────────────────────────────────────
 scene = canvas(
-    width=450, height=450, background=color.white,
-    title="Roller-Coaster Loop with Graphs"
+    width=500, height=600,
+    background=color.white,
+    title="Roller-Coaster Loop with Real-Time Graphs"
 )
-# Sliders and numeric displays
+# h₀ slider + display
 scene.append_to_caption("Release height h₀ (m): ")
-h_slider = slider(min=2, max=9, value=h0, step=0.1, length=200,
-                  bind=update_displays)
+h_slider = slider(min=2, max=9, value=h0, step=0.1, length=200, bind=lambda _: update_displays())
 h_display = wtext(text=f" {h0:.2f}")
-
-scene.append_to_caption("\nLoop radius R (m):     ")
-R_slider = slider(min=0.5, max=2.5, value=R, step=0.1, length=200,
-                  bind=update_displays)
+# R slider + display
+scene.append_to_caption("\nLoop radius R (m):   ")
+R_slider = slider(min=0.5, max=2.5, value=R, step=0.1, length=200, bind=lambda _: update_displays())
 R_display = wtext(text=f" {R:.2f}")
-
 scene.append_to_caption("\n\n")
-run_btn = button(text="Run / Reset")
+# —───────────────────────────────────────────────────────────────────────────
+# Reset simulation: rebuild track, clear curves, start motion
+def init_sim():
+    global h0, R, L_ramp, L_buffer, L_loop, L_exit, s_end
+    global simulate, s, track, cart
+    # read sliders
+    h0, R = h_slider.value, R_slider.value
+    # recompute lengths
+    L_ramp = 0.5 * np.pi * h0
+    L_buffer = 1.0 * R
+    L_loop = 2.0 * np.pi * R
+    L_exit = 5.0
+    s_end = L_ramp + L_buffer + L_loop + L_exit
+    # hide old objects
+    if track: track.visible=False
+    if cart: cart.visible=False; cart.clear_trail()
+    # clear graphs
+    ke_curve.data = []
+    pe_curve.data = []
+    tot_curve.data = []
+    n_curve.data = []
+    # draw track behind at z=-0.01
+    pts = [r_of_s(si) for si in np.linspace(0, s_end, 500)]
+    track = curve(pos=[vector(p.x,p.y,-0.01) for p in pts], radius=0.02, color=color.black)
+    # spawn cart at start position
+    s = ds
+    p = r_of_s(s)
+    cart = box(pos=vector(p.x,p.y,0), size=vector(0.1,0.1,0.1), color=color.red,
+               make_trail=True, trail_radius=0.015, trail_color=color.red)
+    simulate = True
+
+# Run/Reset button
+run_btn = button(text="Run / Reset", bind=init_sim)
 
 # —───────────────────────────────────────────────────────────────────────────
-# Initialize graphs aligned to the right of the canvas
+# Create graphs aligned to the right of the 3D view
 graph_energy = graph(
     title='Energy vs s', xtitle='s (m)', ytitle='Energy (J)',
-    width=350, height=200, align='right'
+    width=300, height=250, align='right'
 )
 ke_curve  = gcurve(graph=graph_energy, color=color.blue, label='KE')
 pe_curve  = gcurve(graph=graph_energy, color=color.green, label='PE')
-tot_curve = gcurve(graph=graph_energy, color=color.black, label='Total')
+tot_curve = gcurve(graph=graph_energy, color=color.black, label='Total E')
 
 graph_force = graph(
-    title='Normal Force vs s', xtitle='s (m)', ytitle='Force (N)',
-    width=350, height=200, align='right'
+    title='Normal Force vs s', xtitle='s (m)', ytitle='N (N)',
+    width=300, height=250, align='right'
 )
 n_curve = gcurve(graph=graph_force, color=color.red, label='N')
 
-# —───────────────────────────────────────────────────────────────────────────
-# Simulation reset: rebuild track, hide old, clear graphs
-
-def init_sim(evt=None):
-    global h0, R, L_ramp, L_buffer, L_loop, L_exit, s_end
-    global simulate, s, track, cart
-
-    # read slider values
-    h0 = h_slider.value
-    R  = R_slider.value
-
-    # recompute lengths
-    L_ramp   = 0.5 * np.pi * h0
-    L_buffer = 1.0 * R
-    L_loop   = 2.0 * np.pi * R
-    L_exit   = 5.0
-    s_end    = L_ramp + L_buffer + L_loop + L_exit
-
-    # hide old
-    if track:
-        track.visible = False
-    if cart:
-        cart.visible = False
-        cart.clear_trail()
-    # clear curves
-    ke_curve.clear()
-    pe_curve.clear()
-    tot_curve.clear()
-    n_curve.clear()
-    n_curve.clear()
-
-    # draw track at z = -0.01
-    pts = [r_of_s(si) for si in np.linspace(0, s_end, 500)]
-    track = curve()
-    pos=[vector(p.x, p.y, -0.01) for p in pts],
-    radius=0.02, color=color.black
-    # start just past zero
-    s = ds
-    p = r_of_s(s)
-    # start just past zero\    s = ds
-    p = r_of_s(s)
-    cart = box(
-        pos=vector(p.x, p.y, 0), size=vector(0.1,0.1,0.1),
-        color=color.red, make_trail=True,
-        trail_radius=0.015, trail_color=color.red
-    )
-
-    simulate = True
-
-# bind reset button and do initial run
-run_btn.bind(init_sim)
+# initial run
 init_sim()
 update_displays()
 
 # —───────────────────────────────────────────────────────────────────────────
-# Main simulation loop: animate & plot in real time
+# Main loop: animate and plot in real time
 while True:
     rate(100)
-    # speed from energy
+    if not simulate:
+        continue
+    # current speed and height
     y = cart.pos.y
-    v = np.sqrt(max(0.0, 2*g*(h0-y)))
-
-    # speed from energy\    y = cart.pos.y
-    v = np.sqrt(max(0.0, 2*g*(h0-y)))
-
-    # numeric tangent direction
-    p0 = r_of_s(s)
-    p1 = r_of_s(min(s+ds, s_end))
-    tangent = norm(p1 - p0)
-
+    v = np.sqrt(max(0.0, 2 * g * (h0 - y)))
+    # forward tangent direction
+    t0 = r_of_s(s)
+    t1 = r_of_s(min(s + ds, s_end))
+    tangent = norm(t1 - t0)
     # normal force
     theta = theta_of_s(s)
-    Rc    = curvature_radius(s)
-    N     = m*(v**2/Rc + g*np.cos(theta)) if np.isfinite(Rc) else m*g*np.cos(theta)
-
+    Rc = curvature_radius(s)
+    N = m * (v ** 2 / Rc + g * np.cos(theta)) if np.isfinite(Rc) else m * g * np.cos(theta)
     # energies
-    KE = 0.5*m*v**2
-    PE = m*g*y
-
-    # plot data
+    KE = 0.5 * m * v ** 2
+    PE = m * g * y
+    # plot graphs
+    n_curve.plot(s, N)
     ke_curve.plot(s, KE)
     pe_curve.plot(s, PE)
-    tot_curve.plot(s, KE+PE)
-    n_curve.plot(s, N)
-
-    # detach on loop if N <= 0
+    tot_curve.plot(s, KE + PE)
+    # detach on loop if needed
     if s > L_ramp and N <= 0:
-        v_vec = tangent * v
+        vel = tangent * v
         while cart.pos.y > 0:
             dt = 0.01
             rate(100)
-            v_vec.y -= g*dt
-            cart.pos += v_vec*dt
+            vel.y -= g * dt
+            cart.pos += vel * dt
         simulate = False
         continue
-
     # advance along track
     s += ds
     p = r_of_s(s)
     cart.pos = vector(p.x, p.y, 0)
-
     if s >= s_end:
         simulate = False
         continue
