@@ -1,20 +1,15 @@
 import numpy as np
-from vpython import (
-    canvas, vector, color, rate, curve, box,
-    slider, button, wtext, norm,
-    graph, gcurve
-)
-
+from vpython import *
 # —───────────────────────────────────────────────────────────────────────────
 # Global constants & state
 # —───────────────────────────────────────────────────────────────────────────
 g = 9.81   # gravitational acceleration (m/s²)
 m = 1.0    # mass of cart (kg) for normal-force calculation
 
-ds = 0.02  # fixed arc-length step
+ds = 0.01  # fixed arc-length step
 
 # Dynamic parameters (updated in init_sim())
-h0, R = 5.0, 1.0
+h0, R = 2.5, 1.0
 L_ramp = L_buffer = L_loop = L_exit = s_end = 0.0
 
 simulate = False
@@ -44,15 +39,10 @@ def r_of_s(s_val):
     # Parameters for the entry curve
     entry_length = L_ramp
     entry_height = h0
-    curve_sharpness = 2.0  # Higher = sharper curve, lower = smoother
 
     # Center the whole track horizontally at x=0
-    total_x = entry_length + L_buffer + 2 * R + L_exit
+    total_x = entry_length + 2 * R  # Removed L_exit
     x_offset = -total_x / 2
-
-    # --- Smooth ramp using a clothoid (Euler spiral) for G1/G2 continuity ---
-    # We'll blend the ramp into the flat using a cubic Hermite curve for y(x)
-    # The ramp goes from (0, h0) to (entry_length, 0) with zero slope at both ends
 
     if s_val < entry_length:
         # Hermite cubic: y = h0 * (2*(s/L)^3 - 3*(s/L)^2 + 1)
@@ -61,16 +51,13 @@ def r_of_s(s_val):
         x = s_val
         return vector(x + x_offset, y, 0)
     s2 = s_val - entry_length
-    if s2 < L_buffer:
-        # Flat buffer
-        return vector(entry_length + s2 + x_offset, 0, 0)
-    s3 = s2 - L_buffer
-    if s3 < L_loop:
-        phi = -np.pi/2 + s3/R
-        center = vector(entry_length + L_buffer + R + x_offset, R, 0)
+    if s2 < L_loop:
+        phi = -np.pi/2 + s2/R
+        center = vector(entry_length + R + x_offset, R, 0)
         return vector(center.x + R*np.cos(phi), center.y + R*np.sin(phi), 0)
-    s4 = s3 - L_loop
-    return vector(entry_length + L_buffer + 2*R + s4 + x_offset, 0, 0)
+    # After the loop, just stay at the end of the loop (no flat exit)
+    end_point = vector(entry_length + 2*R + x_offset, 0, 0)
+    return end_point
 
 def theta_of_s(s_val):
     # Slope angle of the track (for normal force)
@@ -82,38 +69,34 @@ def theta_of_s(s_val):
         dxdt = 1
         return np.arctan2(dydt, dxdt)
     s2 = s_val - entry_length
-    if s2 < L_buffer:
-        return 0.0
-    s3 = s2 - L_buffer
-    if s3 < L_loop:
-        phi = -np.pi/2 + s3/R
+    if s2 < L_loop:
+        phi = -np.pi/2 + s2/R
         return phi + np.pi/2
     return 0.0
 
 def curvature_radius(s_val):
-    # Radius of curvature for normal force calculation
     entry_length = L_ramp
     if s_val < entry_length:
-        # Hermite cubic second derivative
+        # Hermite cubic: y = h0 * (2*(s/L)^3 - 3*(s/L)^2 + 1)
         t = s_val / entry_length
-        d2ydt2 = h0 * (12 * t - 6) / (entry_length**2)
-        dydt = h0 * (6 * t**2 - 6 * t) / entry_length
-        dxdt = 1
-        # Curvature formula: |y''| / (1 + y'^2)^(3/2)
-        denom = (dxdt**2 + dydt**2) ** 1.5
-        if denom == 0:
-            return np.inf
-        kappa = abs(d2ydt2) / denom
-        if kappa == 0:
-            return np.inf
-        return 1 / kappa
+        # First derivative y'
+        dy_dt = h0 * (6 * t**2 - 6 * t) / entry_length
+        dx_dt = 1
+        y_prime = dy_dt / dx_dt
+        # Second derivative y''
+        d2y_dt2 = h0 * (12 * t - 6) / (entry_length ** 2)
+        d2x_dt2 = 0
+        y_double_prime = d2y_dt2 / (dx_dt ** 2)
+        # Curvature k = y'' / (1 + y'^2)^(3/2)
+        denom = (1 + y_prime ** 2) ** 1.5
+        kappa = y_double_prime / denom if denom != 0 else 0
+        if abs(kappa) < 1e-8:
+            return 1e8  # Effectively straight
+        return 1 / abs(kappa)
     s2 = s_val - entry_length
-    if s2 < L_buffer:
-        return np.inf
-    s3 = s2 - L_buffer
-    if s3 < L_loop:
-        return R
-    return np.inf
+    if s2 < L_loop:
+        return R  # Circular loop
+    return 1e8  # After loop, treat as straight (effectively infinite radius)
 
 # —───────────────────────────────────────────────────────────────────────────
 # Initialize VPython canvas and UI
@@ -202,7 +185,7 @@ while True:
     # normal force
     theta = theta_of_s(s)
     Rc = curvature_radius(s)
-    N = m * (v ** 2 / Rc + g * np.cos(theta)) if np.isfinite(Rc) else m * g * np.cos(theta)
+    N = m * (v ** 2 / Rc + g * np.cos(theta))
     # energies
     KE = 0.5 * m * v ** 2
     PE = m * g * y
