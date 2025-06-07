@@ -1,6 +1,5 @@
 import numpy as np
 from vpython import *
-
 # ──────────────────────────────────────────────────────────────
 # Global constants and simulation state
 # ──────────────────────────────────────────────────────────────
