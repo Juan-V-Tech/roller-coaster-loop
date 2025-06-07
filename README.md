@@ -9,7 +9,7 @@ Requirements
 You can install the necessary Python packages with:
 pip install numpy vpython
 
-Usage
+Usage:
 Simply run the provided Python script in an environment where both NumPy and VPython are installed.
 
 Note:
