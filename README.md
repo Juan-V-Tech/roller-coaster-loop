@@ -1,5 +1,5 @@
-Rollercoaster Loop Simulation
-This project simulates a rollercoaster loop and graphs the normal force and energies experienced by a cart as it moves along the track.
+Rollercoaster Loop Simulation with Real Time Graphs
+This Vpython project simulates a rollercoaster loop and graphs the normal force and energies experienced by a cart as it moves along the track.
 
 Requirements
 - Anaconda Python (optional but recommended for easy environment setup) Available: https://www.anaconda.com/download
@@ -11,6 +11,7 @@ pip install numpy vpython
 
 Usage:
 Simply run the provided Python script in an environment where both NumPy and VPython are installed.
+Feel free to play around with the sliders to change the drop height and the loop radius.
 
 Note:
 Depending on your device or Python environment, you might need to make minor edits to the code for full compatibility (such as adjusting the main loop, handling imports, or changing display settings).
