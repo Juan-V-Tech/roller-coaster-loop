@@ -1,0 +1,6 @@
+Requirements
+- Anaconda Python (optional but recommended for easy environment setup) Available: https://www.anaconda.com/download
+- NumPy
+- VPython
+
+
