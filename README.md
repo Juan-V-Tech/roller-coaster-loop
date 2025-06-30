@@ -1,4 +1,4 @@
-Roller Coaster Loop Simulation with Real Time Graphs
+Roller Coaster Loop Simulation with Real-Time Graphs
 
 About:
 This VPython project simulates a roller coaster loop and graphs the normal force and energies experienced by a cart as it moves along the track. Created with the intention of presentation to an undergraduate mechanics physics class, it provides a clear, visual demonstration of energy conservation and force dynamics. The real-time graphs offer insight into how energy and normal force vary throughout the loop.
