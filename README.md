@@ -4,7 +4,11 @@ About:
 This VPython project simulates a roller coaster loop and graphs the normal force and energies experienced by a cart as it moves along the track. Created with the intention of presentation to an undergraduate mechanics physics class, it provides a clear, visual demonstration of energy conservation and force dynamics. The real-time graphs offer insight into how energy and normal force vary throughout the loop.
 This simulation is ideal for instructors to incorporate into lectures for academic enrichment. Maintenance of the simulation is important, so if any issues arise, please report an issue or contact me via one of my GitHub-connected social channels. While not guaranteed, I periodically provide feature updates. If you’re interested in contributing or developing new features, feel free to reach out!
 
-Requirements
+Web Version: Please note that this code may differ slightly or be outdated compared to the code in this repository.
+Link: https://glowscript.org/#/user/Juan%5fV%5fAyro/folder/MyPrograms/program/rollercoastersim
+
+
+Local Requirements
 - NumPy
 - VPython
 - Anaconda Python (optional but recommended for easy environment setup) Available: https://www.anaconda.com/download
